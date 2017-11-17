@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /usr/bin/bash
 
 #************
 # UTILITIES
@@ -6,9 +6,8 @@
 # Get line with max length
 max_line () {
   local max=0
-  # for some reason, read doesn't split on herestrings,
-  # so I don't have to worry about leading and trailing whitespaces
-  # getting stripped
+  # Strips off the white spaces in the line
+
   while IFS= read -r line; do
     if [[ ${#line} > $max ]]; then
       max=${#line}
@@ -21,16 +20,18 @@ max_line () {
 # CENTERED OUTPUT
 #*****************
 # Centered print
+
 cprint () {
   local startindex=1
   if [[ $1 = "-b" ]]; then
     tput bold
-    startindex=2 # should be 2, since 0th element is the script path
+    startindex=2 
   fi
 
   # the quotes around ${@:$startindex} are important to ensure that no
   # word splitting is applied to the arguments (ie. if an argument with spaces
   # is passed in, like "Hello World", it won't be split into 2 separate args)
+
   for text in "${@:$startindex}"; do
     local input_length=$(max_line "$text")
     while IFS= read -r line; do
@@ -46,31 +47,20 @@ cprint () {
 }
 
 # Centered select
+
 cselect () {
   local __retvar=$1
   local prompt=$2
   local options=("${@:3}")
 
-  # Remember to use ${#options[@]} to get the array length
-  # since ${options[@]} expands the array out to all its elements
-  # Just ${#options} erroneously gets the length of the first element
+  #${options[@]} expands the array out to all its elements
+  # Just ${#options} gets the length of the first element
+
   for (( i=0; i<${#options[@]}; ++i )); do
     cprint "$((i+1))) ${options[$i]}"
   done
-
   tput cup $(tput lines) $(( ($(tput cols) - ${#prompt}) /2 ))
   read -p "$prompt " opt
-
-  # OLD COMMENTS WHEN USING RETURN
-  # but this doesn't work if user inputs a non-digit
-  # Parameter expansion to set default value
-  # we can't have opt be empty since we must return an integer
-  # opt=${opt:=0}
-
-  # since we are returning a number, and we need this function
-  # to print to stdout, use return to return an exit status, because we
-  # can't use echo and command substitution
-  # return "$opt"
 
   eval $__retvar=$opt
 }
@@ -80,36 +70,34 @@ cselect () {
 #*************
 
 # source logos
-# d'oh, don't do this, use readlink instead
-# . $(dirname $( ls -l ${BASH_SOURCE[0]} | cut -d " " -f 12 ))"/logos"
+# Takes the logos from the logos file
+
 . $(dirname $(readlink -f ${BASH_SOURCE[0]}))"/logos"
 
 # Choose logo
 get_logo () {
-  local bigsize=$(sort -n <<< "$(max_line "$big")"$'\n'"$(max_line "$shadow")" | tail -1)
+  local bigsize=$(max_line "$big")
+# chooses the small logo
+
   if (( $(tput cols) < bigsize )); then
     echo "$small"
-  else
-    local index=$(( $RANDOM % 2 ))
-    case $index in
-      0)
-        echo "$big"
-        ;;
-      1)
-        echo "$shadow"
-        ;;
-      *)
-        ;;
-    esac
+  else  
+# chooses the bigger logo
+
+    echo "$big"   
   fi
 }
 
 # Main menu
+
 main_menu () {
   cprint -b "WELCOME TO"
   local logo=$(get_logo)
+  # Selects the logo and prints
+
   cprint "$logo"
   echo ""
+# Chooses what the user wants to do 
 
   while true; do
     local opt
@@ -133,8 +121,7 @@ main_menu () {
 
 # Set repeats or no
 set_repeats () {
-  # pass in a variable to set as the return value, since we can't use
-  # echo and command substitution
+ 
   local __retvar=$1
   local repeats
 
@@ -157,13 +144,15 @@ set_repeats () {
     esac
   done
   echo ""
+# Sets the value of the __retvar variable as the value of repeats
+
   eval $__retvar=$repeats
 }
 
 # Set number of pegs
 set_pegs () {
-  # pass in a variable to set as the return value, since we can't use
-  # echo and command substitution
+ # The pegs are A,B,C,D
+
   local __retvar=$1  
   pegs='ABCD'
 
@@ -174,13 +163,17 @@ set_pegs () {
 # of the pattern which matched
 # This can be only used to generate a random string
 # with one of each letter
+# tr -d finally deleted the new line
+
 get_code_no_repeats () {
   local pegs=$1
   echo $pegs | sed "s/./&\n/g" | shuf | tr -d "\n"
+
 }
 
-# Generate random 4 letter string from set ABCDEFG
+# Generate random 4 letter string from set ABCD
 # possibly with repeated letters
+
 get_code_with_repeats () {
   local pegs=$1
   local code=""
@@ -239,7 +232,6 @@ print_board () {
   # note that we must use single-quotes with the $ sign
   # to have \n decoded as newlines
   local numfilled=$(sort -n <<< $'7\n'"$(( ${#board[@]}/2 ))" | head -n 1)
-
   if (( numfilled > 0 )); then
     # Print filled slots
     for (( i=${#board[@]} - 1; i>${#board[@]} - $numfilled * 2; i-=2)); do
@@ -267,12 +259,10 @@ check_input () {
     if [[ ${guess:$i:1} = ${code:$i:1} ]]; then
       ((blacks++))
       bhits=$bhits$i
-      if [[ $whits =~ $i ]]; then
-        ((whites--))
-      fi
+
     else
       for (( j=0; j<4; ++j )); do
-        if [[ ${guess:$i:1} = ${code:$j:1} && ( ! "$whits$bhits" =~ $j ) ]]; then
+        if [[ ${guess:$i:1} = ${code:$j:1} ]]; then
           ((whites++))
           whits=$whits$j
           break
