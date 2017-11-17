@@ -1,1 +1,1 @@
-# Mastermind-Bash
+# Shell Game of Mastermind
