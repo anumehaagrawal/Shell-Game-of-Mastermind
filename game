@@ -1,4 +1,4 @@
-#! /usr/bin/bash
+#! /usr/bin/env bash
 
 #************
 # UTILITIES
@@ -72,7 +72,7 @@ cselect () {
 # source logos
 # Takes the logos from the logos file
 
-. $(dirname $(readlink -f ${BASH_SOURCE[0]}))"/logos"
+. $(dirname $(readlink -f ${BASH_SOURCE[0]}))"/logolist"
 
 # Choose logo
 get_logo () {
@@ -184,6 +184,8 @@ get_code_with_repeats () {
   echo $code
 }
 
+# Sets the code value depending on the repeats value and echoes back to the function
+
 initialize () {
   local repeats=$1
   local pegs=$2
@@ -200,6 +202,8 @@ initialize () {
 # PEG AND BOARD OUTPUT
 #**********************
 
+# Formats pegs 
+
 format_pegs () {
   local pegs=$1
   local res=$(sed "s/./&, /g" <<< $pegs)
@@ -213,30 +217,40 @@ format_board_row () {
 }
 
 print_board () {
-  # be careful when passing an array argument
-  # ensure to dereference/destructure it on assignment
-  # if array is passed in as several positional arguments,
-  # use board=("$@")
+  # When passing an array argument, ensure to dereference/destructure it on assignment
+  # if array is passed in as several positional arguments, use board=("$@")
+  # Initializing board as an array
+
   local board=($1)
+  local flag=1
 
   local numempty=$(( 7 - ${#board[@]}/2 ))
 
   if (( numempty > 0 )); then
     # Print empty slots
     for (( i=0; i<$numempty; ++i )); do
-      # we must use the char \x0 instead of just \0 for sed, as opposed to tr (?)
+      # dev/zero: file having null characters and infinite size
+      # \x: Escapes hexadecimal characters
       cprint "$(head -c 4 /dev/zero | sed "s/\x0/_ /g")| $(head -c 4 /dev/zero | sed "s/\x0/_ /g")"
     done
+  else
+    cprint "You have lost the game"
+    flag=0
+    play_again
   fi
+  # Use single-quotes with the $ sign to have \n decoded as newlines
+  if [ $flag -ne 0 ]
+    then
 
-  # note that we must use single-quotes with the $ sign
-  # to have \n decoded as newlines
-  local numfilled=$(sort -n <<< $'7\n'"$(( ${#board[@]}/2 ))" | head -n 1)
-  if (( numfilled > 0 )); then
-    # Print filled slots
-    for (( i=${#board[@]} - 1; i>${#board[@]} - $numfilled * 2; i-=2)); do
-      cprint "$(format_board_row ${board[i-1]})| $(format_board_row ${board[i]})"
-    done
+    # Checks in the reverse direction for the number of turns left
+    local numfilled=$(sort -n <<< $'7\n'"$(( ${#board[@]}/2 ))" | head -n 1)
+    if (( numfilled > 0 )); then
+      # Print filled slots
+      for (( i=${#board[@]} - 1; i>${#board[@]} - $numfilled * 2; i-=2)); do
+        cprint "$(format_board_row ${board[i-1]})| $(format_board_row ${board[i]})"
+      done
+    fi
+
   fi
 }
 
@@ -247,8 +261,8 @@ check_input () {
   local code=$1
   local guess=$2
 
-  local blacks=0 # num blacks
-  local whites=0 # num whites
+  local blacks=0 # num blacks: Character at the right position
+  local whites=0 # num whites: Character at the wrong position
   local bhits="" # track black indices hit
   local whits="" # track white indices hit
 
@@ -264,14 +278,14 @@ check_input () {
       for (( j=0; j<4; ++j )); do
         if [[ ${guess:$i:1} = ${code:$j:1} ]]; then
           ((whites++))
-          whits=$whits$j
+          whits=$whits$j   #Compares $guess and $code characters and increments 'whites' if in wrong position
           break
         fi
       done
     fi
   done
 
-  echo $blacks $whites
+  echo $blacks $whites     #Returns the final values to the function
 }
 
 # Check if player has won
@@ -330,13 +344,9 @@ play () {
   local board
   while true; do
     cprint -b "Place your pegs: "
-    # Be careful when passing an array argument
-    # make sure to pass it in as a single positional argument
-    # and destructure appropriately in the called function
-    # or pass it as several positional arguments, ie. "${board[@]}"
-    # and destructure appropriately in the called function
+    
     print_board "${board[*]}"
-
+    # Aligns the cursor the centre before taking the input
     tput cup $(tput lines) $(( ($(tput cols) - 4) / 2 - 1))
     read guess
     if [[ -z $guess ]]
@@ -345,7 +355,7 @@ play () {
       continue
     # Note that you should not use quotes for the regex
     # else it will be treated as a string literal
-    elif [[ $guess =~ [^$pegs] || ${#guess} -ne 4 ]]
+    elif [[ $guess =~ [^$pegs] || ${#guess} -ne 4 ]]  # Checks if $guess is contained in $pegs starting from the first character
     then
       cprint "Please input 4 valid pegs $(format_pegs $pegs)!"
     else
